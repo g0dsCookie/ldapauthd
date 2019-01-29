@@ -1,0 +1,32 @@
+version: "3"
+services:
+  ldapauthd:
+    image: g0dscookie/ldapauthd
+    ports:
+      - 8080:8080
+    environment:
+      # loglevel for ldapauthd
+      #- LDAPAUTHD_LOGLEVEL=INFO
+      # run as specified user
+      #- LDAPAUTHD_USER=nobody
+      # run with umask
+      #- LDAPAUTHD_UMASK=755
+      # listen on this ip address
+      #- LDAPAUTHD_IP=0.0.0.0
+      # listen on this port
+      #- LDAPAUTHD_PORT=8080
+      # connect to this ldap host
+      #- LDAP_HOST=dc01.example.org
+      # use this port for connection
+      #- LDAP_PORT=636
+      # use ssl for ldap connection (ldaps://)
+      #- LDAP_SSL=True
+      # validate remote certificate
+      #- LDAP_SSL_VALIDATE=True
+      # basedn for users
+      #- LDAP_BASEDN=ou=Company,dc=example,dc=org
+      # bind user to connect to ldap
+      #- LDAP_BINDDN=cn=bind user,dc=example,dc=org
+      # bind users password
+      # this can also be a path to a plain text file
+      #- LDAP_BINDPW=password
