@@ -16,7 +16,7 @@ LABEL maintainer="${MAINTAINER}" \
 RUN set -eu \
  && cecho() { echo "\033[1;32m$1\033[0m"; } \
  && cecho "###### INSTALLING DEPENDENCIES ######" \
- && apk --no-cache add --virtual ldapauthd-deps python3 py3-pyldap ca-certificates
+ && apk --no-cache add --virtual ldapauthd-deps python3 py3-pyldap ca-certificates bash
 
 COPY --chown=0:0 ldapauthd.py /usr/sbin/ldapauthd
 COPY --chown=0:0 entrypoint.sh /entrypoint
