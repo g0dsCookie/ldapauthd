@@ -10,6 +10,7 @@ This is a simple HTTP server which allows you to authenaticate against ldap with
     - [Configuration](#configuration)
     - [HTTP Headers](#http-headers)
       - [Curl example](#curl-example)
+- [Special Thanks](#special-thanks)
 
 ## Usage
 
@@ -69,3 +70,8 @@ You can configure allowed users/groups with HTTP headers. These are all optional
 With headers:
 
 `$ curl -v --user 'username:password' --header 'X-Ldap-AllowedUsers: username' --header 'X-Ldap-AllowedGroups: group1' localhost:8080`
+
+# Special Thanks
+
+This is based on [sepich/nginx-ldap](https://github.com/sepich/nginx-ldap).
+I've used some code blocks of his script. Basically I've upgraded his script to python3 and changed the configuration process to use the environment instead of a plain text file.
