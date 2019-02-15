@@ -148,7 +148,7 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(name)s [%(levelname)s]: %(message)s")
 
     read_env()
-    drop_privileges()
 
     server = AuthHTTPServer((config["ldapauthd"]["listen"], config["ldapauthd"]["port"]), LdapAuthHandler)
+    drop_privileges()
     server.serve_forever()
