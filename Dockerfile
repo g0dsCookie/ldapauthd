@@ -30,7 +30,7 @@ ENV LDAPAUTHD_LOGLEVEL=INFO \
     LDAP_BINDDN=cn=bind user,dc=example,dc=org \
     LDAP_BINDPW=password
 
-EXPOSE 8080
+EXPOSE 80
 
 VOLUME [ "/usr/local/share/ca-certificates" ]
 
