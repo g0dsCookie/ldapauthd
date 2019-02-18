@@ -70,6 +70,10 @@ def drop_privileges():
     log.info("Now running as %s/%s", username, grp.getgrgid(new_user[3])[0])
 
 
+def is_true(val):
+    return val == "True"
+
+
 def read_env():
     global config
     config = {
@@ -83,8 +87,8 @@ def read_env():
         "ldap": {
             "host": os.getenv("LDAP_HOST"),
             "port": int(os.getenv("LDAP_PORT", 636)),
-            "ssl": bool(os.getenv("LDAP_SSL", True)),
-            "ssl_validate": bool(os.getenv("LDAP_SSL_VALIDATE", True)),
+            "ssl": is_true(os.getenv("LDAP_SSL", True)),
+            "ssl_validate": is_true(os.getenv("LDAP_SSL_VALIDATE", True)),
             "basedn": os.getenv("LDAP_BASEDN"),
             "binddn": os.getenv("LDAP_BINDDN"),
             "bindpw": os.getenv("LDAP_BINDPW"),
@@ -101,6 +105,10 @@ def read_env():
             log.error("%s not defined.", item)
             sys.exit(2)
 
+    if not config["ldap"]["ssl_validate"]:
+        ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+        log.warning("SSL validation has been disabled")
+
     config["ldap"]["uri"] = "%(proto)s://%(host)s:%(port)d" % {"proto": "ldaps" if config["ldap"]["ssl"] else "ldap",
                                                                "host": config["ldap"]["host"],
                                                                "port": config["ldap"]["port"]}
@@ -109,8 +117,6 @@ def read_env():
 def check_auth(user, passwd, allowusers, allowgroups):
     try:
         ldap_con = ldap.initialize(config["ldap"]["uri"])
-        if not config["ldap"]["ssl_validate"]:
-            ldap_con.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
         ldap_con.set_option(ldap.OPT_REFERRALS, 0)
         ldap_con.set_option(ldap.OPT_NETWORK_TIMEOUT, 3)
         ldap_con.simple_bind_s(config["ldap"]["binddn"], config["ldap"]["bindpw"])
