@@ -3,7 +3,7 @@ services:
   ldapauthd:
     image: g0dscookie/ldapauthd
     ports:
-      - 8080:8080
+      - 80:80
     environment:
       # loglevel for ldapauthd
       #- LDAPAUTHD_LOGLEVEL=INFO
@@ -14,7 +14,7 @@ services:
       # listen on this ip address
       #- LDAPAUTHD_IP=0.0.0.0
       # listen on this port
-      #- LDAPAUTHD_PORT=8080
+      #- LDAPAUTHD_PORT=80
       # connect to this ldap host
       #- LDAP_HOST=dc01.example.org
       # use this port for connection

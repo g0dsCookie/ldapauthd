@@ -44,7 +44,7 @@ Configuration for this daemon is read from the current environment. Available co
 | LDAPAUTHD_USER       | User the daemon should be run with.             | nobody  |
 | LDAPAUTHD_UMASK      | Umask the daemon should run with.               | 755     |
 | LDAPAUTHD_IP         | IP address the daemon should listen on.         | 0.0.0.0 |
-| LDAPAUTHD_PORT       | Port the daemon should listen on.               | 8080    |
+| LDAPAUTHD_PORT       | Port the daemon should listen on.               | 80      |
 | LDAP_HOST            | Hostname of your domain controller.             |         |
 | LDAP_PORT            | Port on your domain controller to connect to.   | 636     |
 | LDAP_SSL             | Use SSL for ldap connection.                    | True    |
@@ -65,11 +65,11 @@ You can configure allowed users/groups with HTTP headers. These are all optional
 
 #### Curl example
 
-`$ curl -v --user 'username:password' localhost:8080`
+`$ curl -v --user 'username:password' localhost`
 
 With headers:
 
-`$ curl -v --user 'username:password' --header 'X-Ldap-AllowedUsers: username' --header 'X-Ldap-AllowedGroups: group1' localhost:8080`
+`$ curl -v --user 'username:password' --header 'X-Ldap-AllowedUsers: username' --header 'X-Ldap-AllowedGroups: group1' localhost`
 
 # Special Thanks
 

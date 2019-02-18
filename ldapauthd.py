@@ -78,7 +78,7 @@ def read_env():
             "user": os.getenv("LDAPAUTHD_USER", "nobody"),
             "umask": int(os.getenv("LDAPAUTHD_UMASK", 755)),
             "listen": os.getenv("LDAPAUTHD_IP", "0.0.0.0"),
-            "port": int(os.getenv("LDAPAUTHD_PORT", 8080)),
+            "port": int(os.getenv("LDAPAUTHD_PORT", 80)),
         },
         "ldap": {
             "host": os.getenv("LDAP_HOST"),
