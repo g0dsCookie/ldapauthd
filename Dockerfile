@@ -1,4 +1,4 @@
-FROM alpine:3.8
+FROM alpine:3.9
 
 ARG MAINTAINER="g0dscookie@cookieprojects.de"
 ARG DESCRIPTION="Simple HTTP ldap auth daemon"
