@@ -4,13 +4,9 @@ ARG MAINTAINER="g0dscookie@cookieprojects.de"
 ARG DESCRIPTION="Simple HTTP ldap auth daemon"
 
 ARG VERSION
-ARG BUILD
-ARG BUILD_DATE
 
 LABEL maintainer="${MAINTAINER}" \
       version="${VERSION}" \
-      build="${BUILD}" \
-      buildDate="${BUILD_DATE}" \
       description="${DESCRIPTION}"
 
 RUN set -eu \

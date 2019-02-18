@@ -4,7 +4,7 @@ PATCH	?= 1
 
 TAG	= g0dscookie/ldapauthd
 TAGLIST = -t ${TAG}:${MAJOR} -t ${TAG}:${MAJOR}.${MINOR} -t ${TAG}:${MAJOR}.${MINOR}.${PATCH}
-BUILDARGS = --build-arg MAJOR=${MAJOR} --build-arg MINOR=${MINOR} --build-arg PATCH=${PATCH}
+BUILDARGS = --build-arg VERSION=${MAJOR}.${MINOR}.${PATCH}
 
 .PHONY: nothing
 nothing:
