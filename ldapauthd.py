@@ -23,7 +23,10 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
                 user, passwd = base64.decodebytes(auth_header[6:].encode("utf8")).decode("utf8").split(":", 1)
                 userinfo = check_auth(user, passwd)
                 if userinfo:
+                    fwd_cfg = config["ldapauthd"]["forwardHeaders"]
                     self.send_response(204)
+                    self.send_header(fwd_cfg["username"], userinfo[0])
+                    self.send_header(fwd_cfg["email"], userinfo[1])
                     return
             self.send_response(401)
             self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % config["ldapauthd"]["realm"])
@@ -175,6 +178,10 @@ def read_env():
             "listen": os.getenv("LDAPAUTHD_IP", "0.0.0.0"),
             "port": int(os.getenv("LDAPAUTHD_PORT", 80)),
             "realm": os.getenv("LDAPAUTHD_REALM", "Authorization required"),
+            "forwardHeaders": {
+                "username": os.getenv("LDAPAUTHD_FORWARD_USER", "X-Forwarded-User"),
+                "email": os.getenv("LDAPAUTHD_FORWARD_EMAIL", "X-Forwarded-Email"),
+            }
         },
         "ldap": {
             "backends": ldap3.ServerPool(None, ldap3.ROUND_ROBIN, active=True, exhaust=False),

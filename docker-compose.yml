@@ -17,6 +17,10 @@ services:
       #- LDAPAUTHD_PORT=80
       # String to set in WWW-Authenticate
       #- LDAPAUTHD_REALM=Authorization required
+      # Response HTTP-Header for full username.
+      #- LDAPAUTHD_FORWARD_USER=X-Forwarded-User
+      # Response HTTP-Header for email.
+      #- LDAPAUTHD_FORWARD_EMAIL=X-Forwarded-Email
       # Base DN every search request will be based on.
       #- LDAP_BASEDN=ou=Company,dc=example,dc=org
       # Bind user to use for querying your ldap server.

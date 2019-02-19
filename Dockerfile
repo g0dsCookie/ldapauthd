@@ -24,6 +24,8 @@ ENV LDAPAUTHD_LOGLEVEL=INFO \
     LDAPAUTHD_IP=0.0.0.0 \
     LDAPAUTHD_PORT=80 \
     LDAPAUTHD_REALM=Authorization\ required \
+    LDAPAUTHD_FORWARD_USER=X-Forwarded-User \
+    LDAPAUTHD_FORWARD_EMAIL=X-Forwarded-Email \
     LDAP_ALLOWEDUSERS= \
     LDAP_ALLOWEDGROUPS= \
     LDAP_BASEDN=ou=Company,dc=example,dc=org \
