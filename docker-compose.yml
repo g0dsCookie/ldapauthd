@@ -5,28 +5,32 @@ services:
     ports:
       - 80:80
     environment:
-      # loglevel for ldapauthd
+      # Loglevel the daemon should run on.
       #- LDAPAUTHD_LOGLEVEL=INFO
-      # run as specified user
+      # User the daemon should be run with.
       #- LDAPAUTHD_USER=nobody
-      # run with umask
+      # Umask the daemon should run with.
       #- LDAPAUTHD_UMASK=755
-      # listen on this ip address
+      # IP address the daemon should listen on.
       #- LDAPAUTHD_IP=0.0.0.0
-      # listen on this port
+      # Port the daemon should listen on.
       #- LDAPAUTHD_PORT=80
-      # connect to this ldap host
-      #- LDAP_HOST=dc01.example.org
-      # use this port for connection
-      #- LDAP_PORT=636
-      # use ssl for ldap connection (ldaps://)
-      #- LDAP_SSL=True
-      # validate remote certificate
-      #- LDAP_SSL_VALIDATE=True
-      # basedn for users
+      # String to set in WWW-Authenticate
+      #- LDAPAUTHD_REALM=Authorization required
+      # Base DN every search request will be based on.
       #- LDAP_BASEDN=ou=Company,dc=example,dc=org
-      # bind user to connect to ldap
+      # Bind user to use for querying your ldap server.
       #- LDAP_BINDDN=cn=bind user,dc=example,dc=org
-      # bind users password
-      # this can also be a path to a plain text file
+      # Bind users password.
+      # This can also be a path to a plain text file
       #- LDAP_BINDPW=password
+      # Comma seperated list of ldap backend names.
+      #- LDAP_BACKENDS=dc01
+      # Hostname of your domain controller.
+      #- LDAP_DC01_HOST=dc01.example.org
+      # Port on your domain controller to connect to.
+      #- LDAP_DC01_PORT=636
+      # Use SSL for ldap connection.
+      #- LDAP_DC01_SSL=True
+      # Verify remote SSL certificate.
+      #- LDAP_DC01_SSL_VALIDATE=True

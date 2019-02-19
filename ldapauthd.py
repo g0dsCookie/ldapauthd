@@ -5,7 +5,8 @@ import os
 import pwd
 import grp
 import sys
-import ldap
+import ldap3
+import ssl
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -20,20 +21,64 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
             auth_header = self.headers.get("Authorization")
             if auth_header and auth_header.lower().startswith("basic "):
                 user, passwd = base64.decodebytes(auth_header[6:].encode("utf8")).decode("utf8").split(":", 1)
-                if check_auth(user, passwd, self.headers.get("X-Ldap-AllowedUsers"), self.headers.get("X-Ldap-AllowedGroups")):
+                userinfo = check_auth(user, passwd)
+                if userinfo:
                     self.send_response(204)
                     return
             self.send_response(401)
-            realm = self.headers.get("X-Ldap-Realm")
-            if not realm:
-                realm = "Authorization required"
-            self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % realm)
+            self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % config["ldapauthd"]["realm"])
             self.send_header("Cache-Control", "no-cache")
         except Exception as err:
             self.send_response(500)
             log.error("Failed to process get request: %s", err)
         finally:
             self.end_headers()
+
+
+def in_group(allowed_groups, user_groups):
+    for user_group in user_groups:
+        if user_group in allowed_groups:
+            return True
+    return False
+
+
+def check_auth(username, passwd):
+    cfg = config["ldap"]
+    allowusers = cfg["allowedUsers"]
+    allowgroups = cfg["allowedGroups"]
+
+    if allowusers and username.lower() not in allowusers:
+        # we don't need to ask ldap if the user will be rejected anyway
+        log.debug("User %s not in allowed users [%s]", username, ", ".join(allowusers))
+        return False
+
+    # fetch user info
+    with ldap3.Connection(cfg["backends"], user=cfg["binddn"], password=cfg["bindpw"]) as conn:
+        if not conn.bound:
+            log.error("Could not bind to ldap: %s | %s", conn.result["description"], conn.result["message"])
+            return False
+        if not conn.search(cfg["basedn"], "(&(objectClass=user)(sAMAccountName=%s))" % username,
+                           search_scope=ldap3.SUBTREE, attributes=["cn", "mail", "memberOf"]):
+            log.debug("Could not find user %s", username)
+            return False
+        user = conn.entries[0]
+
+    if allowgroups and not in_group(allowgroups, user.memberOf):
+        # we don't need to authenticate the user if the user is not
+        # a member of one of the groups
+        log.debug("User %s is not member of any group from [%s]",
+                  user.entry_dn, ", ".join(allowgroups))
+        return False
+
+    # check users password
+    with ldap3.Connection(cfg["backends"], user=user.entry_dn, password=passwd) as conn:
+        if not conn.bound:
+            log.debug("Could not bind to ldap with user %s: %s | %s",
+                      user.entry_dn, conn.result["description"], conn.result["message"])
+            return False
+
+    # Return user informations for latter use
+    return (user.cn, user.mail)
 
 
 def drop_privileges():
@@ -74,6 +119,52 @@ def is_true(val):
     return val == "True"
 
 
+def load_backend_config(name):
+    name = "%s_" % name.upper() if name else ""
+    cfg = {
+        "host": os.getenv("LDAP_%sHOST" % name, None),
+        "port": int(os.getenv("LDAP_%sPORT" % name, 636)),
+        "ssl": is_true(os.getenv("LDAP_%sSSL" % name, "True")),
+        "ssl_validate": is_true(os.getenv("LDAP_%sSSL_VALIDATE", "True")),
+    }
+
+    if not cfg["host"]:
+        log.error("LDAP_%sHOST not defined.", name)
+        sys.exit(2)
+    
+    if not cfg["ssl_validate"]:
+        log.warning("SSL validation for backend %s has been disabled.", cfg["host"])
+
+    return cfg
+
+
+def get_ldap_srv(backend_cfg):
+    if backend_cfg["ssl"]:
+
+        tls = ldap3.Tls(validate=ssl.CERT_REQUIRED if backend_cfg["ssl_validate"] else ssl.CERT_NONE,
+                        version=ssl.PROTOCOL_TLSv1)
+        return ldap3.Server(host=backend_cfg["host"], port=backend_cfg["port"], use_ssl=True, tls=tls, get_info=False)
+    else:
+        return ldap3.Server(host=backend_cfg["host"], port=backend_cfg["port"], use_ssl=False, get_info=False)
+
+
+def populate_groups():
+    cfg = config["ldap"]
+    if not cfg["allowedGroups"]:
+        log.debug("No groups to lookup")
+        return
+
+    groups = []
+    for group_name in cfg["allowedGroups"]:
+        with ldap3.Connection(cfg["backends"], user=cfg["binddn"], password=cfg["bindpw"]) as conn:
+            if not conn.search(cfg["basedn"], "(&(objectClass=group)(cn=%s))" % group_name, search_scope=ldap3.SUBTREE) or len(conn.entries) == 0:
+                log.error("Could not find group %s", group_name)
+                continue
+            groups.append(conn.entries[0].entry_dn)
+    log.debug("Found groups [%s]", " | ".join(groups))
+    cfg["allowedGroups"] = groups
+
+
 def read_env():
     global config
     config = {
@@ -83,12 +174,12 @@ def read_env():
             "umask": int(os.getenv("LDAPAUTHD_UMASK", 755)),
             "listen": os.getenv("LDAPAUTHD_IP", "0.0.0.0"),
             "port": int(os.getenv("LDAPAUTHD_PORT", 80)),
+            "realm": os.getenv("LDAPAUTHD_REALM", "Authorization required"),
         },
         "ldap": {
-            "host": os.getenv("LDAP_HOST"),
-            "port": int(os.getenv("LDAP_PORT", 636)),
-            "ssl": is_true(os.getenv("LDAP_SSL", True)),
-            "ssl_validate": is_true(os.getenv("LDAP_SSL_VALIDATE", True)),
+            "backends": ldap3.ServerPool(None, ldap3.ROUND_ROBIN, active=True, exhaust=False),
+            "allowedUsers": os.getenv("LDAP_ALLOWEDUSERS", "").lower().split(","),
+            "allowedGroups": os.getenv("LDAP_ALLOWEDGROUPS", "").split(","),
             "basedn": os.getenv("LDAP_BASEDN"),
             "binddn": os.getenv("LDAP_BINDDN"),
             "bindpw": os.getenv("LDAP_BINDPW"),
@@ -96,57 +187,26 @@ def read_env():
     }
     log.setLevel(config["ldapauthd"]["loglevel"])
 
-    for key, item in {"host": "LDAP_HOST",
-                      "port": "LDAP_PORT",
-                      "basedn": "LDAP_BASEDN",
+    for key, item in {"basedn": "LDAP_BASEDN",
                       "binddn": "LDAP_BINDDN",
                       "bindpw": "LDAP_BINDPW"}.items():
         if key not in config["ldap"] or not config["ldap"][key]:
             log.error("%s not defined.", item)
             sys.exit(2)
 
-    if not config["ldap"]["ssl_validate"]:
-        ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-        log.warning("SSL validation has been disabled")
+    if len(config["ldap"]["allowedUsers"]) == 1 and not config["ldap"]["allowedUsers"][0]:
+        config["ldap"]["allowedUsers"] = None
+    if len(config["ldap"]["allowedGroups"]) == 1 and not config["ldap"]["allowedGroups"][0]:
+        config["ldap"]["allowedGroups"] = None
 
-    config["ldap"]["uri"] = "%(proto)s://%(host)s:%(port)d" % {"proto": "ldaps" if config["ldap"]["ssl"] else "ldap",
-                                                               "host": config["ldap"]["host"],
-                                                               "port": config["ldap"]["port"]}
+    backends = os.getenv("LDAP_BACKENDS", "").split(",")
+    if len(backends) > 1:
+        config["ldap"]["backends"] = ldap3.ServerPool([get_ldap_srv(load_backend_config(x)) for x in backends],
+                                                      ldap3.ROUND_ROBIN, active=True, exhaust=False)
+    else:
+        config["ldap"]["backends"] = get_ldap_srv(load_backend_config(backends[0]))
 
-
-def check_auth(user, passwd, allowusers, allowgroups):
-    try:
-        ldap_con = ldap.initialize(config["ldap"]["uri"])
-        ldap_con.set_option(ldap.OPT_REFERRALS, 0)
-        ldap_con.set_option(ldap.OPT_NETWORK_TIMEOUT, 3)
-        ldap_con.simple_bind_s(config["ldap"]["binddn"], config["ldap"]["bindpw"])
-        data = ldap_con.search_s(base=config["ldap"]["basedn"], scope=ldap.SCOPE_SUBTREE,
-                                 filterstr="(&(objectClass=user)(sAMAccountName=%s))" % user)
-        if not data:
-            return False
-        
-        data = data[0][1]
-        try:
-            ldap_con.simple_bind_s(data["distinguishedName"][0].decode("utf8"), passwd)
-        except ldap.INVALID_CREDENTIALS:
-            return False
-        
-        if allowusers and user.lower() in [x.lower().strip() for x in allowusers.split(",")]:
-            return True
-        if allowgroups:
-            groups = data["memberOf"]
-            if "msSFU30PosixMemberOf" in data:
-                groups += data["msSFU30PosixMemberOf"]
-            for g in [x.lower().strip() for x in allowgroups.split(",")]:
-                for group in groups:
-                    if group.decode("utf8").lower().startswith("cn=%s," % g):
-                        return True
-        return False if allowusers or allowgroups else True
-    except (ldap.CONNECT_ERROR, ldap.SERVER_DOWN) as err:
-        log.error("Failed to connect to %s: %s", config["ldap"]["uri"], err)
-    finally:
-        ldap_con.unbind()
-    return False
+    populate_groups()    
 
 
 if __name__ == "__main__":
