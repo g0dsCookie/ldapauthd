@@ -47,10 +47,10 @@ Configuration for this daemon is read from the current environment. Available co
 | LDAP_BINDDN                 | Bind user to use for querying your ldap server. |                        |
 | LDAP_BINDPW                 | Bind users password.                            |                        |
 | LDAP_BACKENDS               | Comma seperated list of ldap backend names.     |                        |
-| LDAP_<NAME>_HOST            | Hostname of your domain controller.             |                        |
-| LDAP_<NAME>_PORT            | Port on your domain controller to connect to.   | 636                    |
-| LDAP_<NAME>_SSL             | Use SSL for ldap connection.                    | True                   |
-| LDAP_<NAME>_SSL_VALIDATE    | Verify remote SSL certificate.                  | True                   |
+| LDAP_\<NAME\>_HOST          | Hostname of your domain controller.             |                        |
+| LDAP_\<NAME\>_PORT          | Port on your domain controller to connect to.   | 636                    |
+| LDAP_\<NAME\>_SSL           | Use SSL for ldap connection.                    | True                   |
+| LDAP_\<NAME\>_SSL_VALIDATE  | Verify remote SSL certificate.                  | True                   |
 
 #### Curl example
 
