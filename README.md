@@ -45,6 +45,8 @@ Configuration for this daemon is read from the current environment. Available co
 | LDAPAUTHD_REALM             | String to set in WWW-Authenticate               | Authorization required |
 | LDAPAUTHD_FORWARD_USER      | Response HTTP-Header for full username.         | X-Forwarded-User       |
 | LDAPAUTHD_FORWARD_EMAIL     | Response HTTP-Header for email.                 | X-Forwarded-Email      |
+| LDAP_ALLOWEDUSERS           | Allow specific users. Others will be denied     |                        |
+| LDAP_ALLOWEDGROUPS          | Allow specific groups. Others will be denied    |                        |
 | LDAP_BASEDN                 | Base DN every search request will be based on.  |                        |
 | LDAP_BINDDN                 | Bind user to use for querying your ldap server. |                        |
 | LDAP_BINDPW                 | Bind users password.                            |                        |
