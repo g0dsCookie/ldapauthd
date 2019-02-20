@@ -24,7 +24,7 @@ ENV LDAPAUTHD_LOGLEVEL=INFO \
     LDAPAUTHD_IP=0.0.0.0 \
     LDAPAUTHD_PORT=80 \
     LDAPAUTHD_REALM=Authorization\ required \
-    LDAP_ATTRIBUTES={"cn":\ "X-Forwarded-FullName",\ "mail":\ "X-Forwarded-Email",\ "sAMAccountName":\ "X-Forwarded-User"} \
+    LDAP_ATTRIBUTES='{"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}' \
     LDAP_ALLOWEDUSERS= \
     LDAP_ALLOWEDGROUPS= \
     LDAP_BASEDN=ou=Company,dc=example,dc=org \
