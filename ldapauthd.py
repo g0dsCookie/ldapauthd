@@ -64,6 +64,9 @@ def check_auth(username, passwd):
                            search_scope=ldap3.SUBTREE, attributes=list(cfg["attributes"].keys()) + ["memberOf"]):
             log.debug("Could not find user %s", username)
             return False
+        if not conn.entries or len(conn.entries) < 1:
+            log.debug("Could not find user %s", username)
+            return False
         user = conn.entries[0]
 
     if allowgroups and not in_group(allowgroups, user.memberOf):
