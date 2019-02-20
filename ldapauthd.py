@@ -192,7 +192,10 @@ def read_env():
             "attributes": {},
         }
     }
-    log.setLevel(config["ldapauthd"]["loglevel"])
+    loglevel = logging.getLevelName(config["ldapauthd"]["loglevel"])
+    log.setLevel(loglevel)
+    ldap3.utils.log.set_library_log_activation_level(logging.ERROR)
+    ldap3.utils.log.set_library_log_detail_level(ldap3.utils.log.EXTENDED if loglevel == logging.DEBUG else ldap3.utils.log.ERROR)
 
     try:
         data = os.getenv("LDAP_ATTRIBUTES", '{"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}')
