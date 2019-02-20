@@ -17,6 +17,9 @@ class AuthHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 class LdapAuthHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        log.info("%s - - %s" % (self.client_address[0], format % args))
+
     def do_GET(self):
         try:
             auth_header = self.headers.get("Authorization")
