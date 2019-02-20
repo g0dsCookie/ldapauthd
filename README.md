@@ -43,6 +43,7 @@ Configuration for this daemon is read from the current environment. Available co
 | LDAPAUTHD_IP                | IP address the daemon should listen on.          | 0.0.0.0                |
 | LDAPAUTHD_PORT              | Port the daemon should listen on.                | 80                     |
 | LDAPAUTHD_REALM             | String to set in WWW-Authenticate                | Authorization required |
+| LDAP_LOGLEVEL               | https://ldap3.readthedocs.io/logging.html#logging-detail-level | BASIC    |
 | LDAP_ATTRIBUTES             | Attributes to get from ldap and report to client | {"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"} |
 | LDAP_ALLOWEDUSERS           | Allow specific users. Others will be denied      |                        |
 | LDAP_ALLOWEDGROUPS          | Allow specific groups. Others will be denied     |                        |

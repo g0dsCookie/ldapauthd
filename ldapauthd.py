@@ -189,6 +189,7 @@ def read_env():
             "realm": os.getenv("LDAPAUTHD_REALM", "Authorization required"),
         },
         "ldap": {
+            "loglevel": os.getenv("LDAP_LOGLEVEL", "BASIC"),
             "backends": ldap3.ServerPool(None, ldap3.ROUND_ROBIN, active=True, exhaust=False),
             "allowedUsers": os.getenv("LDAP_ALLOWEDUSERS", "").lower().split(","),
             "allowedGroups": os.getenv("LDAP_ALLOWEDGROUPS", "").split(","),
@@ -198,10 +199,13 @@ def read_env():
             "attributes": {},
         }
     }
-    loglevel = logging.getLevelName(config["ldapauthd"]["loglevel"])
-    log.setLevel(loglevel)
+    log.setLevel(config["ldapauthd"]["loglevel"])
     ldap3.utils.log.set_library_log_activation_level(logging.ERROR)
-    ldap3.utils.log.set_library_log_detail_level(ldap3.utils.log.EXTENDED if loglevel == logging.DEBUG else ldap3.utils.log.ERROR)
+    try:
+        ldap3.utils.log.set_library_log_detail_level(ldap3.utils.log.get_detail_level_name(config["ldap"]["loglevel"]))
+    except ValueError:
+        log.error("Invalid loglevel for LDAP_LOGLEVEL. Possible values are OFF, ERROR, BASIC, PROTOCOL, NETWORK or EXTENDED")
+        sys.exit(2)
 
     try:
         data = os.getenv("LDAP_ATTRIBUTES", '{"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}')
