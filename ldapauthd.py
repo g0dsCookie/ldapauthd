@@ -176,6 +176,20 @@ def populate_groups():
     log.debug("Found groups [%s]", " | ".join(groups))
     cfg["allowedGroups"] = groups
 
+ldap3_level_to_detail = {
+    "OFF": ldap3.utils.log.OFF,
+    "ERROR": ldap3.utils.log.ERROR,
+    "BASIC": ldap3.utils.log.BASIC,
+    "PROTOCOL": ldap3.utils.log.PROTOCOL,
+    "NETWORK": ldap3.utils.log.NETWORK,
+    "EXTENDED": ldap3.utils.log.EXTENDED,
+}
+
+def ldap3_level_name_to_detail(level_name):
+    if level_name in ldap3_level_to_detail:
+        return ldap3_level_to_detail[level_name]
+    raise ValueError("unknown detail level")
+
 
 def read_env():
     global config
@@ -202,9 +216,9 @@ def read_env():
     log.setLevel(config["ldapauthd"]["loglevel"])
     ldap3.utils.log.set_library_log_activation_level(logging.ERROR)
     try:
-        ldap3.utils.log.set_library_log_detail_level(ldap3.utils.log.get_detail_level_name(config["ldap"]["loglevel"]))
+        ldap3.utils.log.set_library_log_detail_level(ldap3_level_name_to_detail(config["ldap"]["loglevel"]))
     except ValueError:
-        log.error("Invalid loglevel for LDAP_LOGLEVEL. Possible values are OFF, ERROR, BASIC, PROTOCOL, NETWORK or EXTENDED")
+        log.error("Invalid loglevel for LDAP_LOGLEVEL: %s. Possible values are %s", config["ldap"]["loglevel"], ", ".join(ldap3_level_to_detail.keys()))
         sys.exit(2)
 
     try:
