@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import base64
+import json
 import logging
 import os
 import pwd
@@ -23,10 +24,9 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
                 user, passwd = base64.decodebytes(auth_header[6:].encode("utf8")).decode("utf8").split(":", 1)
                 userinfo = check_auth(user, passwd)
                 if userinfo:
-                    fwd_cfg = config["ldapauthd"]["forwardHeaders"]
                     self.send_response(204)
-                    self.send_header(fwd_cfg["username"], userinfo[0])
-                    self.send_header(fwd_cfg["email"], userinfo[1])
+                    for header_name, header_value in userinfo.items():
+                        self.send_header(header_name, header_value)
                     return
             self.send_response(401)
             self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % config["ldapauthd"]["realm"])
@@ -61,7 +61,7 @@ def check_auth(username, passwd):
             log.error("Could not bind to ldap: %s | %s", conn.result["description"], conn.result["message"])
             return False
         if not conn.search(cfg["basedn"], "(&(objectClass=user)(sAMAccountName=%s))" % username,
-                           search_scope=ldap3.SUBTREE, attributes=["cn", "mail", "memberOf"]):
+                           search_scope=ldap3.SUBTREE, attributes=list(cfg["attributes"].keys()) + ["memberOf"]):
             log.debug("Could not find user %s", username)
             return False
         user = conn.entries[0]
@@ -80,8 +80,11 @@ def check_auth(username, passwd):
                       user.entry_dn, conn.result["description"], conn.result["message"])
             return False
 
+    attributes = {}
+    for attr_name, header_name in cfg["attributes"].items():
+        attributes[header_name] = user[attr_name]
     # Return user informations for latter use
-    return (user.cn, user.mail)
+    return attributes
 
 
 def drop_privileges():
@@ -178,10 +181,6 @@ def read_env():
             "listen": os.getenv("LDAPAUTHD_IP", "0.0.0.0"),
             "port": int(os.getenv("LDAPAUTHD_PORT", 80)),
             "realm": os.getenv("LDAPAUTHD_REALM", "Authorization required"),
-            "forwardHeaders": {
-                "username": os.getenv("LDAPAUTHD_FORWARD_USER", "X-Forwarded-User"),
-                "email": os.getenv("LDAPAUTHD_FORWARD_EMAIL", "X-Forwarded-Email"),
-            }
         },
         "ldap": {
             "backends": ldap3.ServerPool(None, ldap3.ROUND_ROBIN, active=True, exhaust=False),
@@ -190,9 +189,17 @@ def read_env():
             "basedn": os.getenv("LDAP_BASEDN"),
             "binddn": os.getenv("LDAP_BINDDN"),
             "bindpw": os.getenv("LDAP_BINDPW"),
+            "attributes": {},
         }
     }
     log.setLevel(config["ldapauthd"]["loglevel"])
+
+    try:
+        data = os.getenv("LDAP_ATTRIBUTES", '{"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}')
+        config["ldap"]["attributes"] = json.loads(data) if data else {}
+    except json.decoder.JSONDecodeError as err:
+        log.error("Failed to load LDAP_ATTRIBUTES: %s", err)
+        sys.exit(2)
 
     for key, item in {"basedn": "LDAP_BASEDN",
                       "binddn": "LDAP_BINDDN",

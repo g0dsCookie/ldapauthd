@@ -35,26 +35,25 @@ Docker image **g0dscookie/ldapauthd** is available. See **docker-compose.yml** f
 
 Configuration for this daemon is read from the current environment. Available configuration parameters are:
 
-| Environment Variable        | Description                                     | Default                |
-| --------------------------- | ----------------------------------------------- | :--------------------: |
-| LDAPAUTHD_LOGLEVEL          | Loglevel the daemon should run on.              | INFO                   |
-| LDAPAUTHD_USER              | User the daemon should be run with.             | nobody                 |
-| LDAPAUTHD_UMASK             | Umask the daemon should run with.               | 755                    |
-| LDAPAUTHD_IP                | IP address the daemon should listen on.         | 0.0.0.0                |
-| LDAPAUTHD_PORT              | Port the daemon should listen on.               | 80                     |
-| LDAPAUTHD_REALM             | String to set in WWW-Authenticate               | Authorization required |
-| LDAPAUTHD_FORWARD_USER      | Response HTTP-Header for full username.         | X-Forwarded-User       |
-| LDAPAUTHD_FORWARD_EMAIL     | Response HTTP-Header for email.                 | X-Forwarded-Email      |
-| LDAP_ALLOWEDUSERS           | Allow specific users. Others will be denied     |                        |
-| LDAP_ALLOWEDGROUPS          | Allow specific groups. Others will be denied    |                        |
-| LDAP_BASEDN                 | Base DN every search request will be based on.  |                        |
-| LDAP_BINDDN                 | Bind user to use for querying your ldap server. |                        |
-| LDAP_BINDPW                 | Bind users password.                            |                        |
-| LDAP_BACKENDS               | Comma seperated list of ldap backend names.     |                        |
-| LDAP_\<NAME\>_HOST          | Hostname of your domain controller.             |                        |
-| LDAP_\<NAME\>_PORT          | Port on your domain controller to connect to.   | 636                    |
-| LDAP_\<NAME\>_SSL           | Use SSL for ldap connection.                    | True                   |
-| LDAP_\<NAME\>_SSL_VALIDATE  | Verify remote SSL certificate.                  | True                   |
+| Environment Variable        | Description                                      | Default                |
+| --------------------------- | ------------------------------------------------ | ---------------------- |
+| LDAPAUTHD_LOGLEVEL          | Loglevel the daemon should run on.               | INFO                   |
+| LDAPAUTHD_USER              | User the daemon should be run with.              | nobody                 |
+| LDAPAUTHD_UMASK             | Umask the daemon should run with.                | 755                    |
+| LDAPAUTHD_IP                | IP address the daemon should listen on.          | 0.0.0.0                |
+| LDAPAUTHD_PORT              | Port the daemon should listen on.                | 80                     |
+| LDAPAUTHD_REALM             | String to set in WWW-Authenticate                | Authorization required |
+| LDAP_ATTRIBUTES             | Attributes to get from ldap and report to client | {"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"} |
+| LDAP_ALLOWEDUSERS           | Allow specific users. Others will be denied      |                        |
+| LDAP_ALLOWEDGROUPS          | Allow specific groups. Others will be denied     |                        |
+| LDAP_BASEDN                 | Base DN every search request will be based on.   |                        |
+| LDAP_BINDDN                 | Bind user to use for querying your ldap server.  |                        |
+| LDAP_BINDPW                 | Bind users password.                             |                        |
+| LDAP_BACKENDS               | Comma seperated list of ldap backend names.      |                        |
+| LDAP_\<NAME\>_HOST          | Hostname of your domain controller.              |                        |
+| LDAP_\<NAME\>_PORT          | Port on your domain controller to connect to.    | 636                    |
+| LDAP_\<NAME\>_SSL           | Use SSL for ldap connection.                     | True                   |
+| LDAP_\<NAME\>_SSL_VALIDATE  | Verify remote SSL certificate.                   | True                   |
 
 #### Curl example
 
