@@ -17,10 +17,16 @@ services:
       #- LDAPAUTHD_PORT=80
       # String to set in WWW-Authenticate
       #- LDAPAUTHD_REALM=Authorization required
-      # Response HTTP-Header for full username.
-      #- LDAPAUTHD_FORWARD_USER=X-Forwarded-User
-      # Response HTTP-Header for email.
-      #- LDAPAUTHD_FORWARD_EMAIL=X-Forwarded-Email
+      # https://ldap3.readthedocs.io/logging.html#logging-detail-level
+      #- LDAP_LOGLEVEL=ERROR
+      # Attributes to get from ldap and report to client
+      #- LDAP_ATTRIBUTES
+      # Allow specific users. Will be matched with given username
+      #- LDAP_ALLOWEDUSERS
+      # Allow specific groups. Will be matched with full group dn
+      #- LDAP_ALLOWEDGROUPS
+      # The header name where the associated role should be stored
+      #- LDAP_ROLEHEADER
       # Base DN every search request will be based on.
       #- LDAP_BASEDN=ou=Company,dc=example,dc=org
       # Bind user to use for querying your ldap server.

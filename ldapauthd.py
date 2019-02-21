@@ -52,11 +52,16 @@ def check_auth(username, passwd):
     cfg = config["ldap"]
     allowusers = cfg["allowedUsers"]
     allowgroups = cfg["allowedGroups"]
+    attributes = {}
+    allowed = not bool(allowusers or allowgroups)
 
-    if allowusers and username.lower() not in allowusers:
-        # we don't need to ask ldap if the user will be rejected anyway
-        log.debug("User %s not in allowed users [%s]", username, ", ".join(allowusers))
-        return False
+    if not allowed and allowusers:
+        username_lower = username.lower()
+        log.debug("Checking if user %s is explicitly allowed...", username)
+        if username_lower in allowusers:
+            attributes[cfg["roleHeader"]] = allowusers[username_lower]
+            log.debug("User %s is explicitly allowed, Role %s will be assigned", username, allowusers[username_lower])
+            allowed = True
 
     # fetch user info
     with ldap3.Connection(cfg["backends"], user=cfg["binddn"], password=cfg["bindpw"]) as conn:
@@ -72,11 +77,17 @@ def check_auth(username, passwd):
             return False
         user = conn.entries[0]
 
-    if allowgroups and not in_group(allowgroups, user.memberOf):
-        # we don't need to authenticate the user if the user is not
-        # a member of one of the groups
-        log.debug("User %s is not member of any group from [%s]",
-                  user.entry_dn, ", ".join(allowgroups))
+    if not allowed and allowgroups:
+        log.debug("Checking if user %s is allowed by group...", username)
+        for user_group in [x.lower() for x in user.memberOf]:
+            if user_group in allowgroups:
+                attributes[cfg["roleHeader"]] = allowgroups[user_group]
+                log.debug("User %s is allowed, Role %s will be assigned", username, allowgroups[user_group])
+                allowed = True
+                break
+
+    if not allowed:
+        log.debug("User %s is not member of any allowed group and not explicitly allowed.", user.entry_dn)
         return False
 
     # check users password
@@ -85,10 +96,10 @@ def check_auth(username, passwd):
             log.debug("Could not bind to ldap with user %s: %s | %s",
                       user.entry_dn, conn.result["description"], conn.result["message"])
             return False
-
-    attributes = {}
+    
     for attr_name, header_name in cfg["attributes"].items():
         attributes[header_name] = user[attr_name]
+
     # Return user informations for latter use
     return attributes
 
@@ -152,29 +163,12 @@ def load_backend_config(name):
 
 def get_ldap_srv(backend_cfg):
     if backend_cfg["ssl"]:
-
         tls = ldap3.Tls(validate=ssl.CERT_REQUIRED if backend_cfg["ssl_validate"] else ssl.CERT_NONE,
                         version=ssl.PROTOCOL_TLSv1)
         return ldap3.Server(host=backend_cfg["host"], port=backend_cfg["port"], use_ssl=True, tls=tls, get_info=False)
     else:
         return ldap3.Server(host=backend_cfg["host"], port=backend_cfg["port"], use_ssl=False, get_info=False)
 
-
-def populate_groups():
-    cfg = config["ldap"]
-    if not cfg["allowedGroups"]:
-        log.debug("No groups to lookup")
-        return
-
-    groups = []
-    for group_name in cfg["allowedGroups"]:
-        with ldap3.Connection(cfg["backends"], user=cfg["binddn"], password=cfg["bindpw"]) as conn:
-            if not conn.search(cfg["basedn"], "(&(objectClass=group)(cn=%s))" % group_name, search_scope=ldap3.SUBTREE) or len(conn.entries) == 0:
-                log.error("Could not find group %s", group_name)
-                continue
-            groups.append(conn.entries[0].entry_dn)
-    log.debug("Found groups [%s]", " | ".join(groups))
-    cfg["allowedGroups"] = groups
 
 ldap3_level_to_detail = {
     "OFF": ldap3.utils.log.OFF,
@@ -185,10 +179,24 @@ ldap3_level_to_detail = {
     "EXTENDED": ldap3.utils.log.EXTENDED,
 }
 
+
 def ldap3_level_name_to_detail(level_name):
     if level_name in ldap3_level_to_detail:
         return ldap3_level_to_detail[level_name]
     raise ValueError("unknown detail level")
+
+
+def load_json_env(name, env_default=None, default=None):
+    try:
+        data = os.getenv(name, env_default)
+        return json.loads(data) if data else default
+    except json.decoder.JSONDecodeError as err:
+        log.error("Failed to load %s: %s", name, err)
+        sys.exit(2)
+
+
+def to_lower_dict(data):
+    return {k.lower():v for k, v in data.items()} if data else data
 
 
 def read_env():
@@ -203,14 +211,17 @@ def read_env():
             "realm": os.getenv("LDAPAUTHD_REALM", "Authorization required"),
         },
         "ldap": {
-            "loglevel": os.getenv("LDAP_LOGLEVEL", "BASIC"),
+            "loglevel": os.getenv("LDAP_LOGLEVEL", "ERROR"),
             "backends": ldap3.ServerPool(None, ldap3.ROUND_ROBIN, active=True, exhaust=False),
-            "allowedUsers": os.getenv("LDAP_ALLOWEDUSERS", "").lower().split(","),
-            "allowedGroups": os.getenv("LDAP_ALLOWEDGROUPS", "").split(","),
+            "allowedUsers": to_lower_dict(load_json_env("LDAP_ALLOWEDUSERS")),
+            "allowedGroups": to_lower_dict(load_json_env("LDAP_ALLOWEDGROUPS")),
             "basedn": os.getenv("LDAP_BASEDN"),
             "binddn": os.getenv("LDAP_BINDDN"),
             "bindpw": os.getenv("LDAP_BINDPW"),
-            "attributes": {},
+            "attributes": load_json_env("LDAP_ATTRIBUTES",
+                                        env_default='{"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}',
+                                        default={}),
+            "roleHeader": os.getenv("LDAP_ROLEHEADER", "X-Forwarded-Role"),
         }
     }
     log.setLevel(config["ldapauthd"]["loglevel"])
@@ -221,24 +232,12 @@ def read_env():
         log.error("Invalid loglevel for LDAP_LOGLEVEL: %s. Possible values are %s", config["ldap"]["loglevel"], ", ".join(ldap3_level_to_detail.keys()))
         sys.exit(2)
 
-    try:
-        data = os.getenv("LDAP_ATTRIBUTES", '{"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}')
-        config["ldap"]["attributes"] = json.loads(data) if data else {}
-    except json.decoder.JSONDecodeError as err:
-        log.error("Failed to load LDAP_ATTRIBUTES: %s", err)
-        sys.exit(2)
-
     for key, item in {"basedn": "LDAP_BASEDN",
                       "binddn": "LDAP_BINDDN",
                       "bindpw": "LDAP_BINDPW"}.items():
         if key not in config["ldap"] or not config["ldap"][key]:
             log.error("%s not defined.", item)
             sys.exit(2)
-
-    if len(config["ldap"]["allowedUsers"]) == 1 and not config["ldap"]["allowedUsers"][0]:
-        config["ldap"]["allowedUsers"] = None
-    if len(config["ldap"]["allowedGroups"]) == 1 and not config["ldap"]["allowedGroups"][0]:
-        config["ldap"]["allowedGroups"] = None
 
     backends = os.getenv("LDAP_BACKENDS", "").split(",")
     if len(backends) > 1:
@@ -247,7 +246,10 @@ def read_env():
     else:
         config["ldap"]["backends"] = get_ldap_srv(load_backend_config(backends[0]))
 
-    populate_groups()    
+    if config["ldap"]["allowedUsers"]:
+        log.debug("Users explicitly allowed to authenticate: %s", ", ".join(config["ldap"]["allowedUsers"].keys()))
+    if config["ldap"]["allowedGroups"]:
+        log.debug("Groups allowed to authenticate: %s", ", ".join(config["ldap"]["allowedGroups"].keys()))
 
 
 if __name__ == "__main__":
