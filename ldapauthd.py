@@ -138,17 +138,22 @@ def drop_privileges():
     log.info("Now running as %s/%s", username, grp.getgrgid(new_user[3])[0])
 
 
-def is_true(val):
-    return val == "True"
-
+def to_boolean(val):
+    val = val.lower()
+    if val == "true" or val == "1":
+        return True
+    elif val == "false" or val == "0":
+        return False
+    raise ValueError("Unknown boolean value")
+    
 
 def load_backend_config(name):
     name = "%s_" % name.upper() if name else ""
     cfg = {
         "host": os.getenv("LDAP_%sHOST" % name, None),
         "port": int(os.getenv("LDAP_%sPORT" % name, 636)),
-        "ssl": is_true(os.getenv("LDAP_%sSSL" % name, "True")),
-        "ssl_validate": is_true(os.getenv("LDAP_%sSSL_VALIDATE", "True")),
+        "ssl": to_boolean(os.getenv("LDAP_%sSSL" % name, "True")),
+        "ssl_validate": to_boolean(os.getenv("LDAP_%sSSL_VALIDATE", "True")),
     }
 
     if not cfg["host"]:
