@@ -98,7 +98,7 @@ def check_auth(username, passwd):
             return False
     
     for attr_name, header_name in cfg["attributes"].items():
-        attributes[header_name] = user[attr_name]
+        attributes[header_name] = str(user[attr_name]).encode("utf8").decode("latin1")
 
     # Return user informations for latter use
     return attributes
