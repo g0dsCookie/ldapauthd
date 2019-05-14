@@ -7,6 +7,7 @@ RUN set -eu \
  && cecho() { echo "\033[1;32m$1\033[0m"; } \
  && cecho "###### INSTALLING DEPENDENCIES ######" \
  && apk --no-cache add --virtual ldapauthd-deps python3 py2-pip ca-certificates bash \
+ && pip3 --no-cache-dir install --upgrade pip \
  && pip3 --no-cache-dir install ldap3
 
 ARG VERSION
