@@ -4,19 +4,19 @@ import base64
 import json
 import ldap3
 import logging
+import mmh3
 import os
 import pwd
 import grp
-import random
-import string
 import ssl
 import sys
-import threading
-import time
 import uuid
 from http.cookies import SimpleCookie
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
+from pymemcache.client import base
+from pymemcache.exceptions import MemcacheError
+from pymemcache import serde
 
 
 class Ldap:
@@ -50,9 +50,6 @@ class Ldap:
                                          env_default='{"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}',
                                          default={})
         self._roleHeader = os.getenv("LDAP_ROLEHEADER", "X-Forwarded-Role")
-
-        log.debug(self._attributes)
-        log.debug(self._roleHeader)
 
         Ldap._set_loglevel(os.getenv("LDAP_LOGLEVEL", "ERROR"))
         self._backend = Ldap._load_backends(os.getenv("LDAP_BACKENDS", "").split(","))
@@ -170,46 +167,15 @@ class Ldap:
         return info
 
 
-class UserSession:
-    def __init__(self, sessionId):
-        self._sessionId = sessionId
-        self._headers = {}
-    
-    @property
-    def sessionId(self):
-        return self._sessionId
-
-    def __contains__(self, key):
-        return key in self._headers
-
-    def __getitem__(self, key):
-        return self._headers[key]
-    
-    def __setitem__(self, key, value):
-        self._headers[key] = value
-    
-    def __delitem__(self, key):
-        del self._headers[key]
-
-    def __len__(self):
-        return self._headers.__len__()
-
-    def __iter__(self):
-        return self._headers.__iter__()
-
-
 class SessionHandlerBase(abc.ABC):
-    def __init__(self, ttl, id_length = 16, session_chars = string.ascii_letters + string.digits):
-        self._ttl = ttl
-        self._id_length = id_length
+    def __init__(self):
+        self._ttl = int(os.getenv("LDAPAUTHD_SESSION_TTL", 900))
 
     @staticmethod
     def get_handler():
-        session = os.getenv("LDAPAUTHD_SESSION_STORAGE", "memory")
-        ttl = int(os.getenv("LDAPAUTHD_SESSION_TTL", 900))
-
-        if session == "memory":
-            return InMemorySession(ttl)
+        session = os.getenv("LDAPAUTHD_SESSION_STORAGE", "memcached")
+        if session == "memcached":
+            return MemcacheSession()
 
         log.critical("Unknown session storage %s", session)
         exit(20)
@@ -218,16 +184,10 @@ class SessionHandlerBase(abc.ABC):
     def ttl(self):
         return self._ttl
 
-    @property
-    def id_length(self):
-        return self._id_length
-
-    def get_session(self, session_id):
-        if session_id and session_id in self:
-            return self[session_id]
-        session = UserSession(uuid.uuid4())
-        self[session.sessionId] = session
-        return session
+    def new_session(self):
+        session_id = str(uuid.uuid4())
+        session = self[session_id] = {}
+        return (session_id, session)
 
     @abc.abstractmethod
     def run(self):
@@ -235,10 +195,6 @@ class SessionHandlerBase(abc.ABC):
 
     @abc.abstractmethod
     def close(self):
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def __contains__(self, key):
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -250,71 +206,41 @@ class SessionHandlerBase(abc.ABC):
         raise NotImplementedError()
 
 
-class InMemorySession(SessionHandlerBase):
-    def __init__(self, ttl):
-        super().__init__(ttl)
-        self._sessions = {}
-        self._sessions_lock = threading.Lock()
-        self._cleanup_thread = None
-
-    @staticmethod
-    def _is_valid(item):
-        return item["ttl"] > time.time()
-
-    def _cleanup(self):
-        log.debug("Cleanup thread for in-memory sessions started")
-        t = threading.current_thread()
-        i = 0
-        while not getattr(t, "stop_requested", False):
-            if i >= 10:
-                # only run cleanup check every 10 seconds
-                with self._sessions_lock:
-                    for todel in [k for k, v in self._sessions if not InMemorySession._is_valid(v)]:
-                        del self._sessions[todel]
-                        log.debug("Session with id %s expired", todel)
-                i = 0
-            else:
-                i += 1
-            time.sleep(1)
-        log.debug("Cleanup thread for in-memory sessions stopped")
+class MemcacheSession(SessionHandlerBase):
+    def __init__(self):
+        super().__init__()
+        host = os.getenv("LDAPAUTHD_SESSION_HOST", "localhost:11211")
+        if not host.startswith("/"):
+            (host, port) = host.split(":", maxsplit=1)
+            host = (host, int(port))
+        self._opts = {
+            "serializer": serde.python_memcache_serializer,
+            "deserializer": serde.python_memcache_deserializer,
+            "connect_timeout": 10,
+            "timeout": 5,
+            "no_delay": True,
+            "key_prefix": b"lad_sess_",
+        }
+        self._client = base.Client(host, **self._opts)
 
     def run(self):
-        if self._cleanup_thread and self._cleanup_thread.is_alive():
-            return
-        self._cleanup_thread = threading.Thread(target=self._cleanup, name="Session Cleanup")
-        self._cleanup_thread.start()
+        pass
 
     def close(self):
-        if not self._cleanup_thread or not self._cleanup_thread.is_alive():
-            self._cleanup_thread = None
-            return
-        self._cleanup_thread.stop_requested = True
-        self._cleanup_thread.join()
-        self._cleanup_thread = None
-        self._sessions = {}
-
-    def __contains__(self, key):
-        with self._sessions_lock:
-            return key in self._sessions and InMemorySession._is_valid(self._sessions[key])
+        self._client.quit()
 
     def __getitem__(self, key):
-        with self._sessions_lock:
-            s = self._sessions[key]
-            if not InMemorySession._is_valid(s):
-                # generate new session and drop old one
-                s = {
-                    "ttl": time.time() + self.ttl,
-                    "value": UserSession(key),
-                }
-                self._sessions[key] = s
-            return s["value"]
+        try:
+            return self._client.get(mmh3.hash_bytes(key))
+        except MemcacheError as err:
+            log.error("Failed to get session from memcache: %s", err)
+            return None
 
     def __setitem__(self, key, value):
-        with self._sessions_lock:
-            self._sessions[key] = {
-                "ttl": time.time() + self.ttl,
-                "value": value,
-            }
+        try:
+            self._client.set(mmh3.hash_bytes(key), value, expire=self.ttl)
+        except MemcacheError as err:
+            log.error("Failed to store session in memcache: %s", err)
 
 
 class AuthHTTPServer(ThreadingMixIn, HTTPServer):
@@ -322,29 +248,68 @@ class AuthHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 class LdapAuthHandler(BaseHTTPRequestHandler):
+    @property
+    def authorization(self):
+        hdr = self.headers.get("Authorization")
+        if not hdr or not hdr.lower().startswith("basic "):
+            return None
+        return base64.decodebytes(hdr[6:].encode("utf8")) \
+            .decode("utf8").split(":", 1)
+
+    @property
+    def realuri(self):
+        host = self.headers.get("X-Forwarded-Host")
+        path = self.headers.get("X-Forwarded-Uri")
+        return "%s://%s%s" % ("http", host, path)
+
     def log_message(self, format, *args):
         log.info("%s - - %s" % (self.client_address[0], format % args))
 
-    def authenticate(self, user, passwd):
-        return ldap.authenticate(user, passwd)
+    def init_session(self):
+        cookie = SimpleCookie(self.headers.get("Cookie"))
+        sid = cookie.get("_ldapauthd_sess", None)
+        log.debug("Session-ID: %s", sid.value if sid else "None")
+
+        session = sessions[sid.value] if sid else None
+        if not session:
+            (sid, session) = sessions.new_session()
+        self.session = session
+        self.session_id = sid
+
+    def fail_header(self):
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="%s"' % realm)
+        self.send_header("Cache-Control", "no-cache")
 
     def do_GET(self):
         try:
-            auth_header = self.headers.get("Authorization")
-            log.debug(self.headers.get("Cookie", "No Cookie"))
-            if auth_header and auth_header.lower().startswith("basic "):
-                userinfo = self.authenticate(*base64.decodebytes(auth_header[6:].encode("utf8")).decode("utf8").split(":", 1))
-                if userinfo:
-                    self.send_response(204)
-                    for header_name, header_value in userinfo.items():
-                        self.send_header(header_name, header_value)
-                    return
-            self.send_response(401)
-            self.send_header("WWW-Authenticate", "Basic realm=\"%s\"" % realm)
-            self.send_header("Cache-Control", "no-cache")
-        except Exception as err:
-            self.send_response(500)
-            log.error("Failed to process get request: %s", err)
+            self.init_session()
+            if len(self.session) > 0:
+                self.send_response(204)
+                for hdr, val in self.session.items():
+                    self.send_header(hdr, val)
+                return
+
+            auth_header = self.authorization
+            if not auth_header:
+                self.fail_header()
+                return
+
+            usr = ldap.authenticate(*auth_header)
+            if not usr:
+                self.fail_header()
+                return
+
+            cookie = SimpleCookie()
+            cookie["_ldapauthd_sess"] = self.session_id
+
+            self.send_response(307)
+            self.send_header("Set-Cookie", cookie["_ldapauthd_sess"].OutputString())
+            self.send_header("Location", self.realuri)
+            for hdr, val in usr.items():
+                self.send_header(hdr, val)
+                self.session[hdr] = val
+            sessions[self.session_id] = self.session
         finally:
             self.end_headers()
 
@@ -398,7 +363,7 @@ def load_json_env(name, env_default=None, default=None):
 
 
 def to_lower_dict(data):
-    return {k.lower():v for k, v in data.items()} if data else data
+    return {k.lower(): v for k, v in data.items()} if data else data
 
 
 if __name__ == "__main__":
@@ -409,6 +374,8 @@ if __name__ == "__main__":
     realm = os.getenv("LDAPAUTHD_REALM", "Authorization required")
 
     sessions = SessionHandlerBase.get_handler()
+    sessions.run()
+
     ldap = Ldap()
 
     listen = os.getenv("LDAPAUTHD_IP", "0.0.0.0")
