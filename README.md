@@ -74,17 +74,19 @@ Configuration for this daemon is read from the current environment. Available co
 
 | Environment Variable        | Description                                      | Default                |
 | --------------------------- | ------------------------------------------------ | ---------------------- |
-| LDAPAUTHD_LOGLEVEL          | Loglevel the daemon should run on.               | INFO                   |
-| LDAPAUTHD_USER              | User the daemon should be run with.              | nobody                 |
-| LDAPAUTHD_UMASK             | Umask the daemon should run with.                | 755                    |
 | LDAPAUTHD_IP                | IP address the daemon should listen on.          | 0.0.0.0                |
 | LDAPAUTHD_PORT              | Port the daemon should listen on.                | 80                     |
-| LDAPAUTHD_REALM             | String to set in WWW-Authenticate                | Authorization required |
+| LDAPAUTHD_LOGLEVEL          | Loglevel the daemon should run on.               | INFO                   |
+| LDAPAUTHD_USER              | User the daemon should be run with.              | nobody                 |
+| LDAPAUTHD_REALM             | String to set in WWW-Authenticate.               | Authorization required |
+| LDAPAUTHD_SESSION_STORAGE   | Choose session storage backend. Available: memcached | memcached          |
+| LDAPAUTHD_SESSION_HOST      | Host address of your session storage.            | localhost:11211        |
+| LDAPAUTHD_SESSION_TTL       | Maximum TTL for sessions in seconds.             | 900                    |
 | LDAP_LOGLEVEL               | https://ldap3.readthedocs.io/logging.html#logging-detail-level | ERROR    |
 | LDAP_ATTRIBUTES             | Attributes to get from ldap and report to client | {"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"} |
+| LDAP_ROLEHEADER             | The header name where the associated role should be stored | X-Forwarded-Role |
 | LDAP_ALLOWEDUSERS           | Allow specific users. Will be matched with given username |               |
 | LDAP_ALLOWEDGROUPS          | Allow specific groups. Will be matched with full group dn |               |
-| LDAP_ROLEHEADER             | The header name where the associated role should be stored   |               |
 | LDAP_BASEDN                 | Base DN every search request will be based on.   |                        |
 | LDAP_BINDDN                 | Bind user to use for querying your ldap server.  |                        |
 | LDAP_BINDPW                 | Bind users password.                             |                        |
@@ -113,10 +115,3 @@ First matched group will be used to allow access and assign the role.
 Groups are matched case-insensitive.
 
 `LDAP_ALLOWEDGROUPS={"cn=admins,dc=example,dc=org": "admin", "cn=domain users,dc=example,dc=org": "users"}`
-
-# Special Thanks
-
-This is based on [sepich/nginx-ldap](https://github.com/sepich/nginx-ldap).
-I've used some code blocks of his script. Basically I've upgraded his script to python3 and changed the configuration process to use the environment instead of a plain text file.
-
-Since version **0.2.0** most of the code base has changed due to the change of using **ldap3** as ldap module.

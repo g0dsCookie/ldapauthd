@@ -2,6 +2,8 @@ version: "3"
 services:
   ldapauthd:
     image: g0dscookie/ldapauthd
+    networks:
+      - internal
     ports:
       - 80:80
     environment:
@@ -9,24 +11,28 @@ services:
       #- LDAPAUTHD_LOGLEVEL=INFO
       # User the daemon should be run with.
       #- LDAPAUTHD_USER=nobody
-      # Umask the daemon should run with.
-      #- LDAPAUTHD_UMASK=755
       # IP address the daemon should listen on.
       #- LDAPAUTHD_IP=0.0.0.0
       # Port the daemon should listen on.
       #- LDAPAUTHD_PORT=80
       # String to set in WWW-Authenticate
       #- LDAPAUTHD_REALM=Authorization required
+      # Choose session storage backend. Available: memcached
+      #- LDAPAUTHD_SESSION_STORAGE=memcached
+      # Host address of your session storage.
+      #- LDAPAUTHD_SESSION_HOST=sessiondb:11211
+      # Maximum TTL for sessions in seconds.
+      #- LDAPAUTHD_SESSION_TTL=900
       # https://ldap3.readthedocs.io/logging.html#logging-detail-level
       #- LDAP_LOGLEVEL=ERROR
       # Attributes to get from ldap and report to client
-      #- LDAP_ATTRIBUTES
-      # Allow specific users. Will be matched with given username
-      #- LDAP_ALLOWEDUSERS
-      # Allow specific groups. Will be matched with full group dn
-      #- LDAP_ALLOWEDGROUPS
+      #- LDAP_ATTRIBUTES={"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"}
       # The header name where the associated role should be stored
-      #- LDAP_ROLEHEADER
+      #- LDAP_ROLEHEADER=X-Forwarded-Role
+      # Allow specific users. Will be matched with given username
+      #- LDAP_ALLOWEDUSERS=
+      # Allow specific groups. Will be matched with full group dn
+      #- LDAP_ALLOWEDGROUPS=
       # Base DN every search request will be based on.
       #- LDAP_BASEDN=ou=Company,dc=example,dc=org
       # Bind user to use for querying your ldap server.
@@ -44,3 +50,11 @@ services:
       #- LDAP_DC01_SSL=True
       # Verify remote SSL certificate.
       #- LDAP_DC01_SSL_VALIDATE=True
+
+  sessiondb:
+    image: memcached
+    networks:
+      - internal
+
+networks:
+  internal:
