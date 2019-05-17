@@ -3,6 +3,7 @@ import abc
 import base64
 import json
 import ldap3
+from ldap3.core.exceptions import LDAPException
 import logging
 import mmh3
 import os
@@ -148,13 +149,21 @@ class Ldap:
         return True
 
     def authenticate(self, username, password):
-        userinfo = self.fetch_user_info(username)
+        try:
+            userinfo = self.fetch_user_info(username)
+        except LDAPException as err:
+            log.error("Failed to fetch user informations: %s", err)
+            return None
         if not userinfo:
             # user not found
             return None
 
-        if not self.check_auth(userinfo.entry_dn, password):
-            # invalid password
+        try:
+            if not self.check_auth(userinfo.entry_dn, password):
+                # invalid password
+                return None
+        except LDAPException as err:
+            log.debug("Failed to check users password: %s", err)
             return None
 
         allowed, role = self.user_to_role(username)
