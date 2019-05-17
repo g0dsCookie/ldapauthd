@@ -315,6 +315,8 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
 
             cookie = SimpleCookie()
             cookie["_ldapauthd_sess"] = self.session_id
+            if cookie_domain:
+                cookie["_ldapauthd_sess"]["domain"] = cookie_domain
 
             self.send_response(307)
             self.send_header("Set-Cookie", cookie["_ldapauthd_sess"].OutputString())
@@ -385,6 +387,7 @@ if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(name)s [%(levelname)s]: %(message)s")
 
     realm = os.getenv("LDAPAUTHD_REALM", "Authorization required")
+    cookie_domain = os.getenv("LDAPAUTHD_SESSION_DOMAIN", None)
 
     sessions = SessionHandlerBase.get_handler()
     sessions.run()

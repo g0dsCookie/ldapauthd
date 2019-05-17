@@ -19,6 +19,8 @@ services:
       #- LDAPAUTHD_REALM=Authorization required
       # Choose session storage backend. Available: memcached
       #- LDAPAUTHD_SESSION_STORAGE=memcached
+      # Set domain for your session cookie.
+      #- LDAPAUTHD_SESSION_DOMAIN=
       # Host address of your session storage.
       #- LDAPAUTHD_SESSION_HOST=sessiondb:11211
       # Maximum TTL for sessions in seconds.
