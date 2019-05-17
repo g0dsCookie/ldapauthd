@@ -232,6 +232,10 @@ class MemcacheSession(SessionHandlerBase):
         }
         self._client = base.Client(host, **self._opts)
 
+    @staticmethod
+    def _normalize_key(key):
+        return base64.encodebytes(mmh3.hash_bytes(key)).strip()
+
     def run(self):
         pass
 
@@ -240,14 +244,14 @@ class MemcacheSession(SessionHandlerBase):
 
     def __getitem__(self, key):
         try:
-            return self._client.get(mmh3.hash_bytes(key))
+            return self._client.get(self._normalize_key(key))
         except MemcacheError as err:
             log.error("Failed to get session from memcache: %s", err)
             return None
 
     def __setitem__(self, key, value):
         try:
-            self._client.set(mmh3.hash_bytes(key), value, expire=self.ttl)
+            self._client.set(self._normalize_key(key), value, expire=self.ttl)
         except MemcacheError as err:
             log.error("Failed to store session in memcache: %s", err)
 
