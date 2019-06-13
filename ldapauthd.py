@@ -281,36 +281,51 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
     def init_session(self):
         cookie = SimpleCookie(self.headers.get("Cookie"))
         sid = cookie.get("_ldapauthd_sess", None)
-        log.debug("Session-ID: %s", sid.value if sid else "None")
 
-        session = sessions[sid.value] if sid else None
-        if not session:
-            (sid, session) = sessions.new_session()
-        self.session = session
-        self.session_id = sid
+        if sid:
+            self.session_id = sid.value
+            self.session = sessions[self.session_id]
+            if self.session:
+                # session_id is valid
+                log.debug("Got valid session with id %s", self.session_id)
+                return True
+            log.debug("Got invalid session with id %s", self.session_id)
 
-    def fail_header(self):
+        (self.session_id, self.session) = sessions.new_session()
+        log.debug("Initialized new session with id %s", self.session_id)
+        return False
+
+    def unauth_header(self):
         self.send_response(401)
         self.send_header("WWW-Authenticate", 'Basic realm="%s"' % realm)
         self.send_header("Cache-Control", "no-cache")
 
+    def fail_header(self):
+        self.send_response(500)
+
     def do_GET(self):
         try:
-            self.init_session()
-            if len(self.session) > 0:
+            if self.init_session() and len(self.session) > 0:
                 self.send_response(204)
+                log.debug("Sending headers: %s", self.session)
                 for hdr, val in self.session.items():
                     self.send_header(hdr, val)
                 return
 
             auth_header = self.authorization
             if not auth_header:
-                self.fail_header()
+                if self.headers.get("Authorization"):
+                    log.error("Failed to parse authorization header")
+                    log.debug("Authorization header: %s", auth_header)
+                    self.fail_header()
+                    return
+                self.unauth_header()
                 return
 
             usr = ldap.authenticate(*auth_header)
             if not usr:
-                self.fail_header()
+                log.error("Failed to authenticate user")
+                self.unauth_header()
                 return
 
             cookie = SimpleCookie()
@@ -345,7 +360,7 @@ def drop_privileges(username):
         log.info("Can't drop privileges as we are not root: %s/%s",
                  starting_username, starting_groupname)
         return
-        
+
     try:
         os.setgid(new_user[3])
     except OSError as err:
@@ -366,7 +381,7 @@ def to_boolean(val):
     elif val == "false" or val == "0":
         return False
     raise ValueError("Unknown boolean value")
-    
+
 
 def load_json_env(name, env_default=None, default=None):
     try:
