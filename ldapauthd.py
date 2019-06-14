@@ -11,6 +11,7 @@ import pwd
 import grp
 import ssl
 import sys
+from threading import Lock
 import uuid
 from http.cookies import SimpleCookie
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -222,7 +223,8 @@ class MemcacheSession(SessionHandlerBase):
         if not host.startswith("/"):
             (host, port) = host.split(":", maxsplit=1)
             host = (host, int(port))
-        self._opts = {
+        self._lock = Lock()
+        _opts = {
             "serializer": serde.python_memcache_serializer,
             "deserializer": serde.python_memcache_deserializer,
             "connect_timeout": 10,
@@ -230,7 +232,7 @@ class MemcacheSession(SessionHandlerBase):
             "no_delay": True,
             "key_prefix": b"lad_sess_",
         }
-        self._client = base.Client(host, **self._opts)
+        self._client = base.Client(host, **_opts)
 
     @staticmethod
     def _normalize_key(key):
@@ -244,16 +246,22 @@ class MemcacheSession(SessionHandlerBase):
 
     def __getitem__(self, key):
         try:
+            self._lock.acquire()
             return self._client.get(self._normalize_key(key))
         except MemcacheError as err:
             log.error("Failed to get session from memcache: %s", err)
             return None
+        finally:
+            self._lock.release()
 
     def __setitem__(self, key, value):
         try:
+            self._lock.acquire()
             self._client.set(self._normalize_key(key), value, expire=self.ttl)
         except MemcacheError as err:
             log.error("Failed to store session in memcache: %s", err)
+        finally:
+            self._lock.release()
 
 
 class AuthHTTPServer(ThreadingMixIn, HTTPServer):
@@ -300,7 +308,9 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
         self.send_header("WWW-Authenticate", 'Basic realm="%s"' % realm)
         self.send_header("Cache-Control", "no-cache")
 
-    def fail_header(self):
+    def fail_header(self, exc=None):
+        if exc:
+            log.error(exc)
         self.send_response(500)
 
     def do_GET(self):
@@ -340,6 +350,8 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
                 self.send_header(hdr, val)
                 self.session[hdr] = val
             sessions[self.session_id] = self.session
+        except Exception as err:
+            self.fail_header(err)
         finally:
             self.end_headers()
 
