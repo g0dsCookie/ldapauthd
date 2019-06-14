@@ -1,6 +1,6 @@
 MAJOR	?= 1
 MINOR	?= 2
-PATCH	?= 0
+PATCH	?= 1
 
 TAG	= g0dscookie/ldapauthd
 TAGLIST = -t ${TAG}:${MAJOR} -t ${TAG}:${MAJOR}.${MINOR} -t ${TAG}:${MAJOR}.${MINOR}.${PATCH}
