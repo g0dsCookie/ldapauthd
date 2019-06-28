@@ -228,11 +228,12 @@ class MemcacheSession(SessionHandlerBase):
             "serializer": serde.python_memcache_serializer,
             "deserializer": serde.python_memcache_deserializer,
             "connect_timeout": 10,
-            "timeout": 5,
+            "timeout": 10,
             "no_delay": True,
             "key_prefix": b"lad_sess_",
         }
         self._client = base.Client(host, **_opts)
+        self._retryCount = 1
 
     @staticmethod
     def _normalize_key(key):
@@ -242,26 +243,38 @@ class MemcacheSession(SessionHandlerBase):
         pass
 
     def close(self):
-        self._client.quit()
+        with self._lock:
+            self._client.quit()
 
     def __getitem__(self, key):
-        try:
-            self._lock.acquire()
-            return self._client.get(self._normalize_key(key))
-        except MemcacheError as err:
-            log.error("Failed to get session from memcache: %s", err)
-            return None
-        finally:
-            self._lock.release()
+        key = self._normalize_key(key)
+        c = 0
+        while c < self._retryCount:
+            with self._lock:
+                try:
+                    return self._client.get(key)
+                except (ConnectionError, MemcacheError):
+                    c += 1
+                    if c >= self._retryCount:
+                        log.error("Failed to get session from memcache")
+                        raise
+                    log.info("Memcache connection failed, retrying..")
+                    self._client.quit()
 
     def __setitem__(self, key, value):
-        try:
-            self._lock.acquire()
-            self._client.set(self._normalize_key(key), value, expire=self.ttl)
-        except MemcacheError as err:
-            log.error("Failed to store session in memcache: %s", err)
-        finally:
-            self._lock.release()
+        key = self._normalize_key(key)
+        c = 0
+        while c < self._retryCount:
+            with self._lock:
+                try:
+                    self._client.set(key, value, expire=self.ttl)
+                    return
+                except (ConnectionError, MemcacheError):
+                    c += 1
+                    if c >= self._retryCount:
+                        raise
+                    log.info("Memcache connection failed, retrying...")
+                    self._client.quit()
 
 
 class AuthHTTPServer(ThreadingMixIn, HTTPServer):
@@ -309,11 +322,6 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
         self.send_header("WWW-Authenticate", 'Basic realm="%s"' % realm)
         self.send_header("Cache-Control", "no-cache")
 
-    def fail_header(self, exc=None):
-        if exc:
-            log.error(exc)
-        self.send_response(500)
-
     def do_GET(self):
         try:
             if self.init_session() and len(self.session) > 0:
@@ -328,7 +336,7 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
                 if self.headers.get("Authorization"):
                     log.error("Failed to parse authorization header")
                     log.debug("Authorization header: %s", auth_header)
-                    self.fail_header()
+                    self.send_response(500)
                     return
                 self.unauth_header()
                 return
@@ -351,8 +359,9 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
                 self.send_header(hdr, val)
                 self.session[hdr] = val
             sessions[self.session_id] = self.session
-        except Exception as err:
-            self.fail_header(err)
+        except Exception:
+            log.exception("General exception captured")
+            self.send_response(500)
         finally:
             self.end_headers()
 
