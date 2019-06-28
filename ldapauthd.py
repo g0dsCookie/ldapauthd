@@ -279,9 +279,10 @@ class LdapAuthHandler(BaseHTTPRequestHandler):
 
     @property
     def realuri(self):
+        proto = self.headers.get("X-Forwarded-Proto")
         host = self.headers.get("X-Forwarded-Host")
         path = self.headers.get("X-Forwarded-Uri")
-        return "%s://%s%s" % ("http", host, path)
+        return "%s://%s%s" % (proto, host, path)
 
     def log_message(self, format, *args):
         log.info("%s - - %s" % (self.client_address[0], format % args))
