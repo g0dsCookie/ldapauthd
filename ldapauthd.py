@@ -233,7 +233,7 @@ class MemcacheSession(SessionHandlerBase):
             "key_prefix": b"lad_sess_",
         }
         self._client = base.Client(host, **_opts)
-        self._retryCount = 1
+        self._retryCount = int(os.getenv("LDAPAUTHD_SESSION_RETRY", 1))
 
     @staticmethod
     def _normalize_key(key):
@@ -254,12 +254,12 @@ class MemcacheSession(SessionHandlerBase):
                 try:
                     return self._client.get(key)
                 except (ConnectionError, MemcacheError):
-                    c += 1
                     if c >= self._retryCount:
                         log.error("Failed to get session from memcache")
                         raise
                     log.info("Memcache connection failed, retrying..")
                     self._client.quit()
+                    c += 1
 
     def __setitem__(self, key, value):
         key = self._normalize_key(key)
@@ -270,11 +270,12 @@ class MemcacheSession(SessionHandlerBase):
                     self._client.set(key, value, expire=self.ttl)
                     return
                 except (ConnectionError, MemcacheError):
-                    c += 1
                     if c >= self._retryCount:
+                        log.error("Failed to set/update session to memcache")
                         raise
                     log.info("Memcache connection failed, retrying...")
                     self._client.quit()
+                    c += 1
 
 
 class AuthHTTPServer(ThreadingMixIn, HTTPServer):

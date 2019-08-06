@@ -83,6 +83,7 @@ Configuration for this daemon is read from the current environment. Available co
 | LDAPAUTHD_SESSION_DOMAIN    | Set domain for your session cookie.              |                        |
 | LDAPAUTHD_SESSION_HOST      | Host address of your session storage.            | localhost:11211        |
 | LDAPAUTHD_SESSION_TTL       | Maximum TTL for sessions in seconds.             | 900                    |
+| LDAPAUTHD_SESSION_RETRY     | How many times to retry session connection       | 1                      |
 | LDAP_LOGLEVEL               | https://ldap3.readthedocs.io/logging.html#logging-detail-level | ERROR    |
 | LDAP_ATTRIBUTES             | Attributes to get from ldap and report to client | {"cn": "X-Forwarded-FullName", "mail": "X-Forwarded-Email", "sAMAccountName": "X-Forwarded-User"} |
 | LDAP_ROLEHEADER             | The header name where the associated role should be stored | X-Forwarded-Role |

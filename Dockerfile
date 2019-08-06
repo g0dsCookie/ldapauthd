@@ -20,6 +20,7 @@ ENV LDAPAUTHD_LOGLEVEL=INFO \
     LDAPAUTHD_SESSION_DOMAIN= \
     LDAPAUTHD_SESSION_HOST=sessiondb:11211 \
     LDAPAUTHD_SESSION_TTL=900 \
+    LDAPAUTHD_SESSION_RETRY=1 \
     LDAP_LOGLEVEL=ERROR \
     LDAP_BASEDN=ou=Company,dc=example,dc=org \
     LDAP_BINDDN=cn=bind user,dc=example,dc=org \
