@@ -230,7 +230,7 @@ class MemcacheSession(SessionHandlerBase):
             "connect_timeout": 10,
             "timeout": 10,
             "no_delay": True,
-            "key_prefix": b"lad_sess_",
+            "key_prefix": b"lad_sess_" + os.getenv("LDAPAUTHD_SESSION_PREFIX", "").encode("utf8"),
         }
         self._client = base.Client(host, **_opts)
         self._retryCount = int(os.getenv("LDAPAUTHD_SESSION_RETRY", 1))
