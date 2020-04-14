@@ -19,6 +19,8 @@ services:
       #- LDAPAUTHD_REALM=Authorization required
       # Choose session storage backend. Available: memcached
       #- LDAPAUTHD_SESSION_STORAGE=memcached
+      # Key prefix to avoid collisions inside memcache when running multiple ldapauthd instances
+      #- LDAPAUTHD_SESSION_PREFIX=
       # Set domain for your session cookie.
       #- LDAPAUTHD_SESSION_DOMAIN=
       # Host address of your session storage.

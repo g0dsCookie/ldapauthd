@@ -1,34 +1,21 @@
 MAJOR	?= 1
-MINOR	?= 2
-PATCH	?= 3
+MINOR	?= 3
+PATCH	?= 0
 
 TAG	= g0dscookie/ldapauthd
 TAGLIST = -t ${TAG}:${MAJOR} -t ${TAG}:${MAJOR}.${MINOR} -t ${TAG}:${MAJOR}.${MINOR}.${PATCH}
 BUILDARGS = --build-arg VERSION=${MAJOR}.${MINOR}.${PATCH}
 
-.PHONY: nothing
-nothing:
-	@echo "No job given."
-	@exit 1
-
-.PHONY: all
-all: alpine3.9
-
-.PHONY: all-latest
-all-latest: alpine3.9-latest
-
-.PHONY: alpine3.9
-alpine3.9:
+build:
 	docker build ${BUILDARGS} ${TAGLIST} .
 
-.PHONY: alpine3.9-latest
-alpine3.9-latest:
-	docker build ${BUILDARGS} -t ${TAG}:latest ${TAGLIST} .
+latest: TAGLIST := -t ${TAG}:latest ${TAGLIST}
+latest: build
 
-.PHONY: clean
 clean:
-	docker rmi -f $(shell docker images -aq ${TAG})
+	docker rmi -f $(shell docker images -qt ${TAG})
 
-.PHONY: push
 push:
-	docker push $(TAG)
+	docker push ${TAG}
+
+.PHONY: build latest clean push

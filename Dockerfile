@@ -1,4 +1,4 @@
-FROM alpine:3.9
+FROM alpine:3.11
 
 RUN set -eu \
  && cecho() { echo "\033[1;32m$1\033[0m"; } \
@@ -17,6 +17,7 @@ ENV LDAPAUTHD_LOGLEVEL=INFO \
     LDAPAUTHD_PORT=80 \
     LDAPAUTHD_REALM=Authorization\ required \
     LDAPAUTHD_SESSION_STORAGE=memcached \
+    LDAPAUTHD_SESSION_PREFIX= \
     LDAPAUTHD_SESSION_DOMAIN= \
     LDAPAUTHD_SESSION_HOST=sessiondb:11211 \
     LDAPAUTHD_SESSION_TTL=900 \

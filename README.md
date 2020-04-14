@@ -80,6 +80,7 @@ Configuration for this daemon is read from the current environment. Available co
 | LDAPAUTHD_USER              | User the daemon should be run with.              | nobody                 |
 | LDAPAUTHD_REALM             | String to set in WWW-Authenticate.               | Authorization required |
 | LDAPAUTHD_SESSION_STORAGE   | Choose session storage backend. Available: memcached | memcached          |
+| LDAPAUTHD_SESSION_PREFIX    | Key prefix to avoid collisions inside memcache when running multiple ldapauthd instances | |
 | LDAPAUTHD_SESSION_DOMAIN    | Set domain for your session cookie.              |                        |
 | LDAPAUTHD_SESSION_HOST      | Host address of your session storage.            | localhost:11211        |
 | LDAPAUTHD_SESSION_TTL       | Maximum TTL for sessions in seconds.             | 900                    |
