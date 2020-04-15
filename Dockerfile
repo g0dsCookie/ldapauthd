@@ -8,7 +8,7 @@ RUN set -eu \
  && apk --no-cache add --virtual build-deps \
         gcc g++ libc-dev python3-dev \
  && pip3 --no-cache-dir install --upgrade pip \
- && pip3 --no-cache-dir install ldap3 pymemcache murmurhash3 \
+ && pip3 --no-cache-dir install ldap3 pymemcache mmh3 \
  && apk del build-deps
 
 ENV LDAPAUTHD_LOGLEVEL=INFO \
